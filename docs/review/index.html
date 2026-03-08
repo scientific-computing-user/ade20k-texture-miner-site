@@ -233,18 +233,38 @@ function initDatasets(){
 function renderStats(){
   const dsCount = {};
   const stCount = {selected: 0, borderline: 0, rejected: 0};
+  const selectedScores = [];
+  const nonSelectedScores = [];
   for (const r of state.rows){
     const ds = String(r.dataset || "unknown");
     dsCount[ds] = (dsCount[ds] || 0) + 1;
     const st = String(r.status || "rejected");
     if (STATUS_SET.has(st)) stCount[st] += 1;
+    const sc = num(r.final_score, NaN);
+    if (Number.isFinite(sc)){
+      if (st === "selected") selectedScores.push(sc);
+      else nonSelectedScores.push(sc);
+    }
   }
+
+  const minSelected = selectedScores.length ? Math.min(...selectedScores) : NaN;
+  const maxNonSelected = nonSelectedScores.length ? Math.max(...nonSelectedScores) : NaN;
+  let cutoff = 60.0;
+  if (
+    Number.isFinite(minSelected) &&
+    Number.isFinite(maxNonSelected) &&
+    !(cutoff > maxNonSelected && cutoff <= minSelected)
+  ){
+    cutoff = Math.round((minSelected + maxNonSelected) / 2.0);
+  }
+  const goodCount = state.rows.filter((r) => num(r.final_score, 0) >= cutoff).length;
 
   const chips = [];
   chips.push(`<span class=\"chip\">Total <b>${state.rows.length}</b></span>`);
   chips.push(`<span class=\"chip\">Selected <b>${stCount.selected}</b></span>`);
   chips.push(`<span class=\"chip\">Borderline <b>${stCount.borderline}</b></span>`);
   chips.push(`<span class=\"chip\">Rejected <b>${stCount.rejected}</b></span>`);
+  chips.push(`<span class=\"chip\">Recommended cutoff <b>&ge; ${cutoff.toFixed(1)}</b> (good: <b>${goodCount}</b>)</span>`);
   for (const ds of Object.keys(dsCount).sort()) {
     chips.push(`<span class=\"chip\">${escapeHtml(ds)} <b>${dsCount[ds]}</b></span>`);
   }

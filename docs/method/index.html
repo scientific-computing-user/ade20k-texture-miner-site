@@ -133,6 +133,7 @@
     <section class="panel">
       <h2>Ranking Summary</h2>
       <p>These statistics are computed from the live ADE20K review manifest. The top-vs-bottom comparison uses the highest and lowest 10% by final rank score.</p>
+      <p id="cutoffNarrative" style="margin:0 0 8px 0;font-size:13px;color:#4f6278"></p>
       <div id="kpis" class="kpis"></div>
     </section>
 
@@ -493,12 +494,38 @@
       const objFrac = rows.map((r) => num(r.geom_object_fraction));
       const bound = rows.map((r) => num(r.geom_texture_boundary_score));
 
+      const selectedRows = rows.filter((r) => String(r.status || "").toLowerCase() === "selected");
+      const nonSelectedRows = rows.filter((r) => String(r.status || "").toLowerCase() !== "selected");
+      const minSelectedScore = selectedRows.length ? Math.min(...selectedRows.map((r) => num(r.final_score, NaN)).filter(Number.isFinite)) : NaN;
+      const maxNonSelectedScore = nonSelectedRows.length ? Math.max(...nonSelectedRows.map((r) => num(r.final_score, NaN)).filter(Number.isFinite)) : NaN;
+
+      let recommendedCutoff = 60.0;
+      if (
+        Number.isFinite(minSelectedScore) &&
+        Number.isFinite(maxNonSelectedScore) &&
+        !(recommendedCutoff > maxNonSelectedScore && recommendedCutoff <= minSelectedScore)
+      ){
+        recommendedCutoff = Math.round((minSelectedScore + maxNonSelectedScore) / 2.0);
+      }
+      const strictCutoff = Number.isFinite(minSelectedScore) ? Math.floor(minSelectedScore) : recommendedCutoff;
+      const goodAtRecommended = rows.filter((r) => num(r.final_score, 0) >= recommendedCutoff).length;
+      const goodAtStrict = rows.filter((r) => num(r.final_score, 0) >= strictCutoff).length;
+
       const rhoTex = spearman(finalScores, texFrac);
       const rhoObj = spearman(finalScores, objFrac);
       const rhoBnd = spearman(finalScores, bound);
 
       const kpis = [
         {name:"Total ADE20K images", val:n.toString(), sub:"full ranked manifest"},
+        {name:"Recommended cutoff (good vs not good)", val:recommendedCutoff.toFixed(1), sub:`good images: ${goodAtRecommended}`},
+        {name:"Strict cutoff (high confidence)", val:strictCutoff.toFixed(1), sub:`good images: ${goodAtStrict}`},
+        {
+          name:"Observed score gap",
+          val:(Number.isFinite(maxNonSelectedScore) && Number.isFinite(minSelectedScore))
+            ? `${maxNonSelectedScore.toFixed(2)} to ${minSelectedScore.toFixed(2)}`
+            : "n/a",
+          sub:"max non-good to min good"
+        },
         {name:"Top 10% mean score", val:mean(top, (r) => num(r.final_score)).toFixed(2), sub:"vs bottom " + mean(bottom, (r) => num(r.final_score)).toFixed(2)},
         {name:"Texture fraction lift", val:(mean(top, (r) => num(r.geom_texture_fraction)) / Math.max(1e-9, mean(bottom, (r) => num(r.geom_texture_fraction)))).toFixed(2) + "x", sub:"top10 / bottom10"},
         {name:"Object fraction drop", val:(mean(bottom, (r) => num(r.geom_object_fraction)) / Math.max(1e-9, mean(top, (r) => num(r.geom_object_fraction)))).toFixed(2) + "x", sub:"bottom10 / top10"},
@@ -514,6 +541,19 @@
         d.className = "kpi";
         d.innerHTML = "<div class='name'>" + k.name + "</div><div class='val'>" + k.val + "</div><div class='sub'>" + k.sub + "</div>";
         kpiRoot.appendChild(d);
+      }
+
+      const cutoffNarr = document.getElementById("cutoffNarrative");
+      if (cutoffNarr){
+        if (Number.isFinite(maxNonSelectedScore) && Number.isFinite(minSelectedScore)){
+          cutoffNarr.textContent =
+            "Current ADE20K ranking shows a clean separation gap between non-good and good samples " +
+            "(" + maxNonSelectedScore.toFixed(2) + " to " + minSelectedScore.toFixed(2) + "). " +
+            "Recommended operational cutoff is " + recommendedCutoff.toFixed(1) +
+            ", with a stricter high-confidence cutoff at " + strictCutoff.toFixed(1) + ".";
+        } else {
+          cutoffNarr.textContent = "Cutoff could not be estimated from the current manifest.";
+        }
       }
 
       const deciles = [];
