@@ -101,6 +101,102 @@
     .ok{color:var(--green);font-weight:700}
     .note{font-size:13px;color:var(--muted)}
     .math-note{font-size:13px;color:#3d5572;margin-top:-4px;margin-bottom:10px}
+    .stage-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      margin-top:8px;
+    }
+    .stage-card{
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:#fbfdff;
+      padding:11px;
+    }
+    .stage-card h3{
+      margin:0 0 7px 0;
+      font-size:16px;
+      color:#214669;
+    }
+    .stage-card p{
+      margin:0 0 8px 0;
+      font-size:14px;
+      line-height:1.62;
+      color:#23415f;
+    }
+    .stage-visual{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+      margin-top:6px;
+    }
+    .stage-visual figure{
+      margin:0;
+      border:1px solid #d6e1ef;
+      border-radius:8px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .stage-visual img{
+      display:block;
+      width:100%;
+      height:170px;
+      object-fit:cover;
+      background:#eef3f8;
+    }
+    .stage-visual figcaption{
+      padding:6px 7px;
+      font-size:11px;
+      color:#39516d;
+      border-top:1px solid #e3ebf4;
+      background:#f9fcff;
+    }
+    .stage-metrics{
+      margin-top:7px;
+      font-size:12px;
+      color:#405875;
+      line-height:1.55;
+    }
+    .split-two{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+      margin-top:6px;
+    }
+    .mini-card{
+      border:1px solid #d6e1ef;
+      border-radius:8px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .mini-card .cap{
+      padding:5px 7px;
+      font-size:11px;
+      color:#39516d;
+      border-top:1px solid #e3ebf4;
+      background:#f9fcff;
+    }
+    .mini-card img{
+      display:block;
+      width:100%;
+      height:160px;
+      object-fit:cover;
+      background:#eef3f8;
+    }
+    .pill{
+      display:inline-block;
+      border:1px solid #c7d8ec;
+      background:#f2f8ff;
+      color:#2b4c71;
+      border-radius:999px;
+      padding:2px 8px;
+      font-size:11px;
+      margin-right:5px;
+      margin-top:5px;
+    }
+    @media (max-width:980px){
+      .stage-grid{grid-template-columns:1fr}
+    }
     mjx-container{overflow-x:auto;overflow-y:hidden;padding:2px 0}
   </style>
 </head>
@@ -120,6 +216,33 @@
       <h2>What Problem the Scorer Solves</h2>
       <p>Many natural images are visually rich but not texture-segmentation-friendly. A highly semantic scene can look complicated while still being a weak candidate for texture-transition analysis, and a visually simple scene can contain two or three strong material regimes that are ideal for texture segmentation. The scorer resolves this mismatch by ranking images according to texture-transition structure rather than semantic saliency, which is why the pipeline separates positive texture evidence from semantic counter-evidence before final ranking.</p>
       <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="panel">
+      <h2>End-to-End Staged Pipeline (Visual Walkthrough)</h2>
+      <p>Instead of describing the stages abstractly, this section shows one representative example per stage from the live manifest. The goal is to make the decision flow concrete: Stage A checks whether proposal structure is texture-friendly, geometry enrichment turns that structure into region-level texture evidence, Stage B tests semantic alignment using contrastive retrieval, and Stage D applies a conservative rubric that can veto semantically dominant false positives.</p>
+      <div class="stage-grid">
+        <article class="stage-card">
+          <h3>Stage A: Proposal Statistics Gate</h3>
+          <p>This stage asks whether the proposal distribution looks like texture fragmentation rather than a single dominant object. It summarizes proposal count, dominance, small-region prevalence, and entropy into a single prior score.</p>
+          <div id="stageA_slot"></div>
+        </article>
+        <article class="stage-card">
+          <h3>Geometry Enrichment</h3>
+          <p>This stage transforms region structure into texture evidence: boundary coherence, texture occupancy, object occupancy, and large-region organization. The overlay view is where boundary quality becomes visually interpretable.</p>
+          <div id="stageGeom_slot"></div>
+        </article>
+        <article class="stage-card">
+          <h3>Stage B: CLIP Retrieval Filter</h3>
+          <p>This stage keeps images whose text-image contrast supports texture transition cues while suppressing object-centric semantics. Showing both a kept and filtered sample clarifies how the retrieval contrast behaves around the decision boundary.</p>
+          <div id="stageB_slot"></div>
+        </article>
+        <article class="stage-card">
+          <h3>Stage D: Rubric Audit (Optional)</h3>
+          <p>This stage is a safety layer: it can preserve strong texture-dominant scenes, but it can also veto semantically problematic scenes even when upstream scores are high. The paired examples below show this conservative correction in action.</p>
+          <div id="stageD_slot"></div>
+        </article>
+      </div>
     </section>
 
     <section class="panel">
@@ -283,6 +406,24 @@ Output: ranked manifest R and hosted review subset H
       const n = Number(v);
       return Number.isFinite(n) ? n : d;
     };
+    const esc = (s) => String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+    const fmt = (v, d=2) => Number.isFinite(Number(v)) ? Number(v).toFixed(d) : "n/a";
+    const asset = (p) => {
+      const s = String(p || "").trim();
+      if (!s) return "";
+      if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/")) return s;
+      return "../review/" + s.replace(/^\.?\//, "");
+    };
+    const bust = (p) => {
+      const u = asset(p);
+      if (!u) return "";
+      return u + (u.includes("?") ? "&" : "?") + "v=ade20k_v1";
+    };
 
     function corr(xs, ys){
       const n = Math.min(xs.length, ys.length);
@@ -301,6 +442,143 @@ Output: ranked manifest R and hosted review subset H
       const den = Math.sqrt(dx * dy);
       if (!Number.isFinite(den) || den <= 1e-12) return NaN;
       return num / den;
+    }
+
+    function pickTop(filterFn, scoreFn){
+      const cand = rows.filter((r) => {
+        if (!filterFn(r)) return false;
+        return Boolean(r && (r.thumb || r.image_path));
+      });
+      cand.sort((a,b) => asNum(scoreFn(b), -1e9) - asNum(scoreFn(a), -1e9));
+      return cand[0] || null;
+    }
+
+    function imgOrThumb(r){
+      return r?.image_path || r?.thumb || "";
+    }
+
+    function renderStageA(){
+      const ex = pickTop(
+        (r) => r.stageA_pass === true,
+        (r) => asNum(r.stageA_rwtd_score, 0) + 0.03 * asNum(r.stageA_n_masks, 0)
+      );
+      const slot = document.getElementById("stageA_slot");
+      if (!slot || !ex){
+        if (slot) slot.innerHTML = "<p class='note'>No representative sample available.</p>";
+        return;
+      }
+      slot.innerHTML = `
+        <div class="stage-visual">
+          <figure>
+            <img src="${bust(imgOrThumb(ex))}" alt="Stage A original image"/>
+            <figcaption>Original image</figcaption>
+          </figure>
+          <figure>
+            <img src="${bust(ex.mask_rel)}" alt="Stage A mask visualization"/>
+            <figcaption>Proposal/mask visualization</figcaption>
+          </figure>
+        </div>
+        <div class="stage-metrics">
+          <span class="pill">${esc(ex.image_id)}</span>
+          <span class="pill">stageA_pass: ${ex.stageA_pass ? "true" : "false"}</span><br/>
+          stageA_rwtd_score: <b>${fmt(ex.stageA_rwtd_score, 2)}</b>,
+          n_masks: <b>${fmt(ex.stageA_n_masks, 0)}</b>,
+          largest_ratio: <b>${fmt(ex.stageA_largest_ratio, 3)}</b>,
+          small_frac: <b>${fmt(ex.stageA_small_frac, 3)}</b>.
+        </div>
+      `;
+    }
+
+    function renderStageGeom(){
+      const ex = pickTop(
+        (r) => asNum(r.geom_texture_boundary_score, NaN) > 0,
+        (r) => asNum(r.geom_texture_boundary_score, 0) - 80 * asNum(r.geom_object_fraction, 0)
+      );
+      const slot = document.getElementById("stageGeom_slot");
+      if (!slot || !ex){
+        if (slot) slot.innerHTML = "<p class='note'>No representative sample available.</p>";
+        return;
+      }
+      slot.innerHTML = `
+        <div class="stage-visual">
+          <figure>
+            <img src="${bust(imgOrThumb(ex))}" alt="Geometry stage original image"/>
+            <figcaption>Original image</figcaption>
+          </figure>
+          <figure>
+            <img src="${bust(ex.overlay_rel)}" alt="Geometry boundary overlay"/>
+            <figcaption>Boundary/region overlay</figcaption>
+          </figure>
+        </div>
+        <div class="stage-metrics">
+          <span class="pill">${esc(ex.image_id)}</span><br/>
+          boundary_score: <b>${fmt(ex.geom_texture_boundary_score, 2)}</b>,
+          texture_fraction: <b>${fmt(ex.geom_texture_fraction, 3)}</b>,
+          object_fraction: <b>${fmt(ex.geom_object_fraction, 4)}</b>,
+          large_regions: <b>${fmt(ex.geom_num_large_texture_regions, 0)}</b>,
+          strong_boundaries: <b>${fmt(ex.geom_num_strong_boundaries, 0)}</b>.
+        </div>
+      `;
+    }
+
+    function renderStageB(){
+      const keep = pickTop(
+        (r) => r.stageB_pass === true,
+        (r) => asNum(r.stageB_clip_score, -1e9)
+      );
+      const filt = pickTop(
+        (r) => r.stageB_pass === false && Number.isFinite(asNum(r.stageB_clip_score, NaN)),
+        (r) => asNum(r.stageB_clip_score, -1e9)
+      );
+      const slot = document.getElementById("stageB_slot");
+      if (!slot || (!keep && !filt)){
+        if (slot) slot.innerHTML = "<p class='note'>No representative sample available.</p>";
+        return;
+      }
+      slot.innerHTML = `
+        <div class="split-two">
+          ${keep ? `
+          <div class="mini-card">
+            <img src="${bust(imgOrThumb(keep))}" alt="Stage B kept example"/>
+            <div class="cap">Kept by Stage B<br/>${esc(keep.image_id)}<br/>clip_score=${fmt(keep.stageB_clip_score, 4)}, stageB_pass=true</div>
+          </div>` : ""}
+          ${filt ? `
+          <div class="mini-card">
+            <img src="${bust(imgOrThumb(filt))}" alt="Stage B filtered example"/>
+            <div class="cap">Filtered by Stage B<br/>${esc(filt.image_id)}<br/>clip_score=${fmt(filt.stageB_clip_score, 4)}, stageB_pass=false</div>
+          </div>` : ""}
+        </div>
+      `;
+    }
+
+    function renderStageD(){
+      const match = pickTop(
+        (r) => r.stageD_decision === "match",
+        (r) => asNum(r.stageD_score_0_100, -1e9)
+      );
+      const reject = pickTop(
+        (r) => r.stageD_decision === "not_match",
+        (r) => asNum(r.final_score, -1e9)
+      );
+      const slot = document.getElementById("stageD_slot");
+      if (!slot || (!match && !reject)){
+        if (slot) slot.innerHTML = "<p class='note'>No representative sample available.</p>";
+        return;
+      }
+      slot.innerHTML = `
+        <div class="split-two">
+          ${match ? `
+          <div class="mini-card">
+            <img src="${bust(match.overlay_rel || imgOrThumb(match))}" alt="Stage D match example"/>
+            <div class="cap">Rubric match<br/>${esc(match.image_id)}<br/>stageD_score=${fmt(match.stageD_score_0_100, 0)}, decision=match</div>
+          </div>` : ""}
+          ${reject ? `
+          <div class="mini-card">
+            <img src="${bust(reject.overlay_rel || imgOrThumb(reject))}" alt="Stage D not-match example"/>
+            <div class="cap">Rubric veto / not_match<br/>${esc(reject.image_id)}<br/>stageD_score=${fmt(reject.stageD_score_0_100, 0)}, decision=not_match</div>
+          </div>` : ""}
+        </div>
+      `;
     }
 
     const bothScoreTex = [];
@@ -337,6 +615,11 @@ Output: ranked manifest R and hosted review subset H
         <div class="sub">${k.sub}</div>
       </div>
     `).join("");
+
+    renderStageA();
+    renderStageGeom();
+    renderStageB();
+    renderStageD();
   </script>
 </body>
 </html>
