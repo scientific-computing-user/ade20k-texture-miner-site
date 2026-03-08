@@ -6,39 +6,35 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>ADE20K Texture Miner: Technical Deep Dive</title>
+  <title>ADE20K Texture Miner: Method Heart</title>
   <style>
     :root{
       --bg:#ecf1f6;
       --panel:#ffffff;
       --ink:#13283f;
-      --muted:#556881;
-      --line:#d5dee8;
+      --muted:#566a84;
+      --line:#d6dfe9;
       --blue:#1f5fa9;
-      --green:#1d8f56;
-      --amber:#b76a05;
+      --green:#1f8d57;
     }
     *{box-sizing:border-box}
     body{
       margin:0;
-      background:linear-gradient(140deg,#e7eef5,#f7fbff);
+      background:linear-gradient(140deg,#e8eff6,#f8fbff);
       color:var(--ink);
       font-family:"Avenir Next","Helvetica Neue",Arial,sans-serif;
     }
-    .wrap{max-width:1200px;margin:0 auto;padding:18px}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
     .panel{
       background:var(--panel);
       border:1px solid var(--line);
       border-radius:14px;
-      padding:16px;
+      padding:18px;
       margin-bottom:12px;
     }
-    h1{margin:0 0 10px 0;font-size:30px;line-height:1.2}
-    h2{margin:8px 0 8px 0;font-size:22px}
-    h3{margin:10px 0 6px 0;font-size:17px}
-    p{margin:0 0 10px 0;line-height:1.6;color:#1d3654}
-    ul{margin:0 0 10px 20px;color:#1d3654}
-    li{margin:3px 0}
+    h1{margin:0 0 10px 0;font-size:31px;line-height:1.2}
+    h2{margin:8px 0 8px 0;font-size:23px}
+    p{margin:0 0 11px 0;line-height:1.72;color:#1a3554}
     .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .btn{
       display:inline-flex;align-items:center;
@@ -49,7 +45,7 @@
     .btn:hover{background:#f3f7fc}
     .kpis{
       display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
       gap:8px;
       margin-top:8px;
     }
@@ -62,87 +58,24 @@
     .kpi .name{font-size:12px;color:var(--muted);margin-bottom:4px}
     .kpi .val{font-size:24px;font-weight:700;color:#10355d}
     .kpi .sub{font-size:12px;color:var(--muted)}
-    .tag{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      border:1px solid var(--line);
-      border-radius:999px;
-      padding:4px 10px;
-      font-size:12px;
-      color:#334b65;
-      background:#f7fbff;
-      margin-right:6px;
-      margin-bottom:6px;
+    .eq{
+      border-left:3px solid #bdd1eb;
+      background:#f4f9ff;
+      padding:8px 11px;
+      border-radius:6px;
+      color:#18426a;
+      margin:8px 0 12px 0;
+      line-height:1.6;
     }
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:10px;
-    }
-    .box{
-      border:1px solid var(--line);
-      border-radius:10px;
-      padding:10px;
-      background:#fff;
-    }
-    .box h3{margin-top:0}
-    pre{
-      margin:0;
-      padding:10px;
-      border:1px solid var(--line);
-      border-radius:10px;
-      background:#f5f9fd;
-      overflow:auto;
-      line-height:1.5;
-      color:#123556;
-    }
-    code{
-      background:#eef4fb;
-      border:1px solid #dbe6f4;
-      border-radius:4px;
-      padding:1px 5px;
-      color:#153a60;
-      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      font-size:92%;
-    }
-    table{
-      width:100%;
-      border-collapse:collapse;
-      font-size:13px;
-      border:1px solid var(--line);
-      border-radius:10px;
-      overflow:hidden;
-    }
-    th,td{
-      border-bottom:1px solid #e6edf5;
-      padding:8px 9px;
-      text-align:left;
-      vertical-align:top;
-    }
-    th{
-      background:#f7fbff;
-      color:#244261;
-      font-weight:600;
-    }
+    .accent{color:var(--blue);font-weight:700}
     .ok{color:var(--green);font-weight:700}
-    .warn{color:var(--amber);font-weight:700}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-    @media (max-width:980px){
-      .grid{grid-template-columns:1fr}
-    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <section class="panel">
-      <h1>ADE20K Texture Miner: Hardcore Technical Deep Dive</h1>
-      <p>This page is the implementation-level companion for readers who want exact pipeline behavior, not only ranking plots. It documents the production scoring path used to build the current ADE20K texture-ranked review manifest and maps each piece to code locations for reproducibility.</p>
-      <div>
-        <span class="tag">Problem type: texture-awareness ranking</span>
-        <span class="tag">Dataset in this site: ADE20K review subset (1500)</span>
-        <span class="tag">Score range: 0 to 100</span>
-      </div>
+      <h1>Method Heart: How the Texture Scorer Works</h1>
+      <p>This page explains the core scoring logic in paper style. The key idea is to avoid treating texture suitability as a binary yes-or-no classification and instead estimate it as a structured evidence consolidation problem: we combine proposal fragmentation statistics, region-level boundary coherence, texture occupancy, and semantic counter-evidence into one conservative score that is reliable for ranking. In other words, the system is not trying to guess objects; it is trying to measure whether an image naturally supports RWTD-like texture partitioning.</p>
       <div class="nav">
         <a class="btn" href="./">Method and Evidence</a>
         <a class="btn" href="../review/">Open ADE20K Gallery</a>
@@ -151,211 +84,57 @@
     </section>
 
     <section class="panel">
-      <h2>1) Formal Setup</h2>
-      <p>Given an image set <span class="mono">{x_i}</span>, the miner outputs a scalar ranking score <span class="mono">s_i in [0, 100]</span> and interpretable diagnostics. The optimization target is not semantic segmentation quality; it is monotonic ordering by texture suitability for RWTD-like two-to-four region texture transitions. Practically, the miner computes staged signals <span class="mono">f_i^A, f_i^geom, f_i^B, f_i^D</span> and fuses them into final score <span class="mono">s_i</span>.</p>
+      <h2>What Problem the Scorer Solves</h2>
+      <p>Many natural images are visually rich but not texture-segmentation-friendly. A highly semantic scene can look complicated while still being a poor candidate for texture-transition analysis, and a seemingly simple scene can contain two or three strong material regimes that are ideal for texture segmentation. The scorer is designed to resolve this mismatch by ranking images according to texture transition structure rather than object saliency. This is why the pipeline explicitly separates positive texture evidence from negative semantic evidence before any final ranking decision is made.</p>
       <div class="kpis" id="kpis"></div>
     </section>
 
     <section class="panel">
-      <h2>2) End-to-End Staged Pipeline</h2>
-      <div class="grid">
-        <div class="box">
-          <h3>Stage A: Proposal Statistics Gate</h3>
-          <p>Reads annotation masks per image and computes region-size statistics and entropy. Produces <code>stageA_rwtd_score</code> and pass/fail gate.</p>
-          <p class="mono">Code: stages/stage_a_maskstats.py</p>
-        </div>
-        <div class="box">
-          <h3>Geometry Enrichment</h3>
-          <p>Builds geometry proxies that approximate texture suitability: boundary strength, texture occupancy, object occupancy, ambiguity, and region-level structure.</p>
-          <p class="mono">Code: utils/rwtd_reference.py</p>
-        </div>
-        <div class="box">
-          <h3>Stage B: CLIP Retrieval Filter</h3>
-          <p>Computes image-text similarity against positive and negative query banks. Keeps high-score rows and top-k-by-query rows to preserve diversity.</p>
-          <p class="mono">Code: stages/stage_b_clip.py</p>
-        </div>
-        <div class="box">
-          <h3>Stage D: VLM Rubric Audit (Optional)</h3>
-          <p>Applies natural-language rubric plus hard rules to suppress semantic-object dominant false positives and weak-boundary overlays.</p>
-          <p class="mono">Code: stages/stage_d_vlm.py</p>
-        </div>
-      </div>
-      <p>Final ranking uses multimodal fusion where geometry remains dominant, CLIP is secondary, and VLM acts as a corrective signal with explicit penalties.</p>
-      <p class="mono">Code: cli.py::_apply_multimodal_fusion_score</p>
+      <h2>Scoring Principle in One Equation</h2>
+      <p>The final score is the sum of a geometry-dominant backbone plus calibrated multimodal corrections. Conceptually, we start from a base texture-structure estimate and only allow retrieval and language signals to adjust it modestly, so that ranking behavior remains anchored in region geometry and boundary evidence instead of drifting toward semantic shortcuts.</p>
+      <p class="eq"><span class="accent">S_final</span> = clamp( <span class="accent">S_base</span> + small retrieval correction + small rubric correction - consistency penalties, 0, 100 )</p>
+      <p>This design choice is central. If secondary signals dominate, the ranking becomes unstable and object-biased; if geometry dominates too strongly with no correction, the ranking keeps too many ambiguous or cluttered scenes. The implemented blend intentionally sits between these extremes.</p>
     </section>
 
     <section class="panel">
-      <h2>3) Stage A Equations and Gate Logic</h2>
-      <p>For each image, let mask areas normalized by image area be <span class="mono">r_1 ... r_n</span>. Define:</p>
-      <pre>n_score       = min(1, n_masks / 120)
-largest_score = 1 - min(1, largest_ratio / 0.65)
-median_score  = 1 - min(1, median_ratio / 0.03)
-small_score   = min(1, small_frac / 0.55)
-entropy_score = min(1, entropy / 4.0)
-
-stageA_rwtd_score = 100 * (
-    0.28 * n_score +
-    0.24 * largest_score +
-    0.18 * median_score +
-    0.18 * small_score +
-    0.12 * entropy_score
-)</pre>
-      <p>Default hard gate:</p>
-      <pre>n_masks >= 80
-largest_ratio <= 0.60
-median_ratio <= 0.02
-small_frac >= 0.30
-entropy >= 2.0 (if entropy gate enabled)</pre>
-      <p>Fallback policy allows unknown Stage A rows to pass to Stage B if configured, reducing accidental early-drop caused by parse failures.</p>
+      <h2>Stage A: Fragmentation as a Texture Prior</h2>
+      <p>The first evidence source is mask-statistics structure. Images with richer texture transitions tend to produce many mid-to-small coherent proposals instead of a few dominating regions. The scorer therefore measures mask count, largest-region dominance, median proposal size, small-mask prevalence, and area entropy. Taken together, these features act as a weak prior that the image has enough texture micro-structure to be worth further analysis. This stage is deliberately conservative: it is not expected to finalize ranking quality, but it is expected to filter out trivially unsuitable cases and stabilize the downstream distribution.</p>
+      <p>Importantly, this stage is also robustness-aware: unknown parse cases are not automatically thrown away, because hard dropping on parser noise would bias the pool. Instead, uncertain items can continue to later stages where stronger evidence is available.</p>
     </section>
 
     <section class="panel">
-      <h2>4) Geometry Priority Score (RWTD-Calibrated Baseline)</h2>
-      <p>The geometry baseline is explicit and heavily weighted toward texture-boundary evidence:</p>
-      <pre>tex_bonus     = 20 * clip((tex - 0.65) / 0.35, 0, 1)
-region_bonus  = +6 if 2<=large_regions<=4, +2 if >4, else -8
-strong_bonus  = +3 if strong_boundaries>=1 else -4
-obj_penalty   = 180 * clip(obj_frac - 0.002, 0, 1)
-amb_penalty   = 120 * clip(ambiguous_frac, 0, 1)
-clutter_pen   = 4 * clip(large_regions - 5, 0, +inf)
-
-score_geom = clip(
-    0.20 * stageA_rwtd_score +
-    0.60 * geom_texture_boundary_score +
-    tex_bonus + region_bonus + strong_bonus
-    - obj_penalty - amb_penalty - clutter_pen,
-0, 100)</pre>
-      <p>This is the "do not overfit to semantics" anchor in the full system.</p>
+      <h2>Geometry Backbone: Boundary-Coherent Texture Evidence</h2>
+      <p>The heart of the scorer is the geometry backbone. It promotes images with high texture occupancy, coherent region-level boundaries, and plausible two-to-four region decomposition, while penalizing object-dominant area, ambiguous mixed zones, and cluttered over-fragmentation. This stage embodies the central research bias: good texture-ranking candidates should look decomposable by material transition, not by object identity. Because this signal is derived from region geometry rather than class labels, it transfers better to non-semantic texture tasks and stays closer to the RWTD setting.</p>
+      <p class="eq"><span class="accent">S_base</span> = weighted(texture-boundary strength, texture occupancy, region coherence) - penalties(object dominance, ambiguity, clutter)</p>
+      <p>This backbone is what makes the scorer scientifically meaningful for texture studies: it encodes the target structure directly instead of relying on proxies that can overfit semantics.</p>
     </section>
 
     <section class="panel">
-      <h2>5) Stage B CLIP Rule (Filtering + Diversity Retention)</h2>
-      <p>Stage B only evaluates candidates that pass upstream gates and minimum resolution (<code>short_side >= 256</code> by default).</p>
-      <pre>pos = max_q sim(image_emb, pos_query_emb[q])
-neg = max_q sim(image_emb, neg_query_emb[q])
-clip_score = pos - alpha * neg     (alpha = 0.7 default)</pre>
-      <p>Keep rule is deliberately a union:</p>
-      <pre>pass = (clip_score >= threshold) OR (in top_k of any positive query)
-threshold = 0.20
-top_k_per_positive_query = 2000</pre>
-      <p>This avoids losing uncommon but valid texture scenes that might be under-scored by one global threshold.</p>
+      <h2>Retrieval Correction: Keep Rare but Valid Texture Scenes</h2>
+      <p>Stage B introduces text-image retrieval as a controlled correction, not a replacement signal. Positive prompts describe texture transitions and textured materials, while negative prompts represent object-centric or graphic-design scenes. The retrieval score is computed as positive affinity minus weighted negative affinity, then used with a union keep policy that combines threshold passing and per-query top-k retention. This union rule matters because a single global threshold would remove rare but valid texture cases that only match a subset of positive cues. In practical terms, Stage B broadens recall while preserving precision pressure from the geometry backbone.</p>
     </section>
 
     <section class="panel">
-      <h2>6) Stage D VLM Rubric and Hard Overrides</h2>
-      <p>Stage D scores only a shortlist (<code>top_n from Stage B</code>, default 2000) and returns structured output:</p>
-      <pre>{
-  score_0_100: int,
-  decision: "match" | "borderline" | "not_match",
-  main_reason: string,
-  flags: [ ... ]
-}</pre>
-      <p>Hard rules then enforce conservative behavior:</p>
-      <ul>
-        <li><code>salient_semantic_subject</code> can force <code>not_match</code> and cap score.</li>
-        <li>Overlay boundary audit can force <code>not_match</code> when boundary structure is weak/noisy.</li>
-        <li>Overlay failure applies cap and penalty; missing overlay can also trigger conservative downgrade.</li>
-      </ul>
-      <p>This stage is used as calibration, not as primary scorer.</p>
+      <h2>Rubric Correction: Semantic Veto and Boundary Audit</h2>
+      <p>Stage D adds rubric-based reasoning over shortlisted images. It asks whether a scene is genuinely texture-dominant, whether boundaries are region-level rather than noisy fragments, and whether strong semantic subjects are likely to contaminate texture-centric ranking. The contribution of this stage is intentionally small in numeric weight, but its hard veto logic is important: when the model detects salient semantic subjects or failed overlay-boundary evidence, it can force a conservative downgrade. This avoids a common failure mode where visually impressive images with strong objects are incorrectly promoted as texture exemplars.</p>
+      <p>Viewed as a system, Stage D is not where ranking is created; it is where ranking is de-risked.</p>
     </section>
 
     <section class="panel">
-      <h2>7) Multimodal Fusion and Final Status Assignment</h2>
-      <pre>clip100 = percentile_robust_scale(stageB_clip_score)
-
-if has_clip:
-    fused = 0.92 * base_geom + 0.08 * clip100
-if has_vlm:
-    fused = 0.90 * base_geom + 0.08 * clip100 + 0.02 * vlm_score
-
-fused -= penalties_from_flags
-fused += 2 if decision == "match"
-fused -= 2 if decision == "not_match"
-fused = clip(fused, 0, 100)</pre>
-      <p>Status labels in this site are derived from final score: <code>selected >= 80</code>, <code>borderline >= 70</code>, otherwise <code>rejected</code>. For operational retrieval, the recommended broader cutoff is currently <code>score >= 60</code>.</p>
+      <h2>From Continuous Score to Practical Decisions</h2>
+      <p>The score is continuous so users can choose operating points by task. In this hosted review, status labels follow fixed intervals to support quick browsing, while a broader operational cutoff is shown for mining workflows that value recall. This is why the interface can simultaneously present strict selections and a wider recommendation band without inconsistency: they serve different phases of the curation pipeline.</p>
+      <p class="eq"><span class="accent">selected</span> for high-precision inspection, <span class="accent">borderline</span> for manual review, and <span class="accent">recommended mining band</span> for high-recall candidate expansion.</p>
     </section>
 
     <section class="panel">
-      <h2>8) Deterministic Review Subset Policy (Why 1500 Here)</h2>
-      <p>The ADE20K corpus is larger than what is convenient for live browser review. The command-line run uses <code>--review_limit 1500</code> and then builds a deterministic balanced subset. Allocation defaults to roughly:</p>
-      <ul>
-        <li>35% selected</li>
-        <li>25% borderline</li>
-        <li>40% rejected (mixed high-score hard negatives and diverse lower-score negatives)</li>
-      </ul>
-      <p>The full manifest can still be generated offline; this hosted split is for practical, auditable human inspection.</p>
+      <h2>Why This Is Not "Magic"</h2>
+      <p>The apparent gain comes from decomposition. No single component is expected to solve texture ranking alone. Stage A contributes structural prior, geometry backbone contributes most discriminative power, Stage B recovers hard-but-valid cases, and Stage D suppresses semantic leakage. The final behavior emerges from this staged factorization and conservative fusion. That is why the scorer remains interpretable: each major error mode can be traced back to one evidence channel being weak, noisy, or in conflict with others.</p>
+      <p><span class="ok">Interpretability claim:</span> every final score is backed by separable diagnostic terms, which is what makes the system auditable instead of opaque.</p>
     </section>
 
     <section class="panel">
-      <h2>9) Pseudocode (Inference Path)</h2>
-      <pre>for image in dataset:
-    A = stage_a_mask_stats(image, annotations)
-    G = geometry_features(image, annotations)
-    base = texture_priority_score(A, G)
-
-    if stage_b_enabled:
-        B = clip_filter(image)
-    else:
-        B = pass_from_stage_a
-
-    if stage_d_enabled and B.pass and in_stage_b_top_n:
-        D = vlm_rubric_and_overlay(image, overlay)
-        D = apply_hard_decision_rules(D)
-    else:
-        D = none
-
-    score = multimodal_fusion(base, B, D)
-    status = threshold(score)
-    emit(image_id, score, status, diagnostics)</pre>
-    </section>
-
-    <section class="panel">
-      <h2>10) Complexity and Compute Profile</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Component</th>
-            <th>Dominant Cost</th>
-            <th>Implementation Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Stage A</td>
-            <td>Mask-area parsing per image</td>
-            <td>CPU parallelized with <code>ProcessPoolExecutor</code>.</td>
-          </tr>
-          <tr>
-            <td>Geometry stage</td>
-            <td>Mask decode + boundary extraction</td>
-            <td>Also produces mask/overlay assets for diagnostics.</td>
-          </tr>
-          <tr>
-            <td>Stage B</td>
-            <td>Image embedding and text similarity</td>
-            <td>Embeddings are memmapped to avoid high RAM spikes.</td>
-          </tr>
-          <tr>
-            <td>Stage D</td>
-            <td>VLM calls on shortlist only</td>
-            <td>Top-N bound limits latency and API/GPU cost.</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section class="panel">
-      <h2>11) Reproducibility Map</h2>
-      <p>Core paths and functions used to generate this site:</p>
-      <ul>
-        <li><code>rwtd_miner/cli.py</code>: CLI commands, fusion scoring, review subset logic (<code>_build_balanced_review_subset</code>, <code>_apply_multimodal_fusion_score</code>).</li>
-        <li><code>rwtd_miner/stages/stage_a_maskstats.py</code>: Stage A formulas and pass gate.</li>
-        <li><code>rwtd_miner/utils/rwtd_reference.py</code>: geometry texture-priority calibration score.</li>
-        <li><code>rwtd_miner/stages/stage_b_clip.py</code>: CLIP scoring, threshold + top-k union keep policy.</li>
-        <li><code>rwtd_miner/stages/stage_d_vlm.py</code>: VLM rubric outputs, hard overrides, shortlist processing.</li>
-      </ul>
-      <p><span class="ok">Reproducibility guarantee:</span> all thresholds on this page are sourced from code and config defaults, not post-hoc manual edits.</p>
-      <p><span class="warn">Scope note:</span> this miner is a ranking/screening system for texture suitability, not a final segmentation model.</p>
+      <h2>Reproducibility Note</h2>
+      <p>The implementation uses fixed configuration defaults and deterministic subset construction for the live 1500-image browser set, so users can reproduce the same ranking profile and status composition from the same manifest snapshot. The site is intentionally separated from ARCHITEXTURE outputs to keep this miner's conclusions independent and easy to audit.</p>
     </section>
   </div>
 
@@ -386,15 +165,12 @@ fused = clip(fused, 0, 100)</pre>
       return num / den;
     }
 
-    const scores = rows.map((r) => asNum(r.final_score, NaN)).filter((v) => Number.isFinite(v));
-    const tex = rows.map((r) => asNum(r.geom_texture_fraction, NaN));
-    const obj = rows.map((r) => asNum(r.geom_object_fraction, NaN));
     const bothScoreTex = [];
     const bothScoreObj = [];
     for (let i = 0; i < rows.length; i++){
       const s = asNum(rows[i].final_score, NaN);
-      const t = tex[i];
-      const o = obj[i];
+      const t = asNum(rows[i].geom_texture_fraction, NaN);
+      const o = asNum(rows[i].geom_object_fraction, NaN);
       if (Number.isFinite(s) && Number.isFinite(t)) bothScoreTex.push([s, t]);
       if (Number.isFinite(s) && Number.isFinite(o)) bothScoreObj.push([s, o]);
     }
@@ -411,9 +187,9 @@ fused = clip(fused, 0, 100)</pre>
 
     const kpis = [
       {name: "Rows in live manifest", val: rows.length, sub: "Hosted review subset"},
-      {name: "Selected / borderline / rejected", val: `${selected} / ${borderline} / ${rejected}`, sub: "Status from final score thresholds"},
-      {name: "Corr(score, texture fraction)", val: Number.isFinite(scoreTexCorr) ? scoreTexCorr.toFixed(3) : "n/a", sub: "Should be positive"},
-      {name: "Corr(score, object fraction)", val: Number.isFinite(scoreObjCorr) ? scoreObjCorr.toFixed(3) : "n/a", sub: "Should be negative"},
+      {name: "Selected / borderline / rejected", val: `${selected} / ${borderline} / ${rejected}`, sub: "Status from final score intervals"},
+      {name: "Corr(score, texture fraction)", val: Number.isFinite(scoreTexCorr) ? scoreTexCorr.toFixed(3) : "n/a", sub: "Positive alignment"},
+      {name: "Corr(score, object fraction)", val: Number.isFinite(scoreObjCorr) ? scoreObjCorr.toFixed(3) : "n/a", sub: "Negative alignment"},
     ];
 
     document.getElementById("kpis").innerHTML = kpis.map((k) => `
