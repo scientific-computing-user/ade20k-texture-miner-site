@@ -48,6 +48,7 @@
     .kv{margin-top:8px;font-size:13px}
     .kv b{display:inline-block;width:230px;color:var(--muted)}
     .btn{height:34px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 10px;cursor:pointer}
+    a.btn{display:inline-flex;align-items:center;text-decoration:none;color:#30445d}
     .btn.primary{background:#0f3c75;color:#fff;border-color:#0f3c75}
     .empty{grid-column:1/-1;background:#fff;border:1px solid #d6dee7;border-radius:10px;padding:14px;color:#5b6a7e}
     pre{white-space:pre-wrap;word-break:break-word;background:#f7f9fb;border:1px solid var(--line);padding:10px;border-radius:8px}
@@ -56,7 +57,14 @@
 </head>
 <body>
   <div class="wrap">
-  <div class="head"><h2>ADE20K Texture Miner Review</h2><button class="btn" id="reset">Reset Filters</button></div>
+  <div class="head">
+    <h2>ADE20K Texture Miner Review</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <a class="btn" href="../method/">Method &amp; Ranking Evidence</a>
+      <a class="btn" href="../">Home</a>
+      <button class="btn" id="reset">Reset Filters</button>
+    </div>
+  </div>
 
   <div class="help">
     <div><b>How to review:</b> filter/sort, then mark good images with the checkbox on each card. You can auto-select by score threshold and manually deselect mistakes, then export selected names.</div>
